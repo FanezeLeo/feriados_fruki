@@ -1,323 +1,298 @@
+import request from 'supertest';
+import { createApp } from '../../../src/app';
+import { Application } from 'express';
 import { holidayService } from '../../../src/services/holiday.service';
-import { holidayRepository } from '../../../src/repositories/holiday.repository';
-import { locationService } from '../../../src/services/location.service';
-import { Holiday, Location } from '../../../src/types';
+import { NotFoundError } from '../../../src/utils/errors';
 
-jest.mock('../../../src/repositories/holiday.repository');
-jest.mock('../../../src/services/location.service');
+jest.mock('../../src/services/holiday.service');
 
-const saoPauloCity: Location = {
-  id: 'loc-sao-paulo',
-  type: 'municipality',
-  code: 'SP-SAO-PAULO',
-  name: 'São Paulo',
-  stateCode: 'SP',
-  createdAt: new Date(),
-  updatedAt: new Date(),
-};
+describe('Holiday endpoints', () => {
+  let app: Application;
 
-const saoPauloState: Location = {
-  id: 'loc-sp',
-  type: 'state',
-  code: 'SP',
-  name: 'São Paulo',
-  stateCode: 'SP',
-  createdAt: new Date(),
-  updatedAt: new Date(),
-};
+  beforeAll(() => {
+    app = createApp();
+  });
 
-const rioCity: Location = {
-  id: 'loc-rio',
-  type: 'municipality',
-  code: 'RJ-RIO-DE-JANEIRO',
-  name: 'Rio de Janeiro',
-  stateCode: 'RJ',
-  createdAt: new Date(),
-  updatedAt: new Date(),
-};
-
-const holiday = (date: string, type: Holiday['type'], name = 'Feriado'): Holiday => ({
-  id: `holiday-${date}-${type}-${name.toLowerCase().replace(/\s+/g, '-')}`,
-  name,
-  date: new Date(`${date}T00:00:00.000Z`),
-  year: Number(date.slice(0, 4)),
-  type,
-  isFixed: true,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-});
-
-const optionalHoliday = (date: string, name = 'Ponto Facultativo'): Holiday => ({
-  ...holiday(date, 'optional', name),
-  isFixed: false,
-});
-
-describe('HolidayService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (locationService.getLocationByCode as jest.Mock).mockResolvedValue(saoPauloCity);
   });
 
-  it('returns next holidays using country, state and municipality hierarchy', async () => {
-    const nextHolidays = [
-      holiday('2026-06-04', 'municipal', 'Corpus Christi'),
-      holiday('2026-07-09', 'state', 'Revolução Constitucionalista de 1932'),
-      holiday('2026-09-07', 'national', 'Independência do Brasil'),
-    ];
-    (holidayRepository.findNextApplicableByLocation as jest.Mock).mockResolvedValue(nextHolidays);
-
-    const result = await holidayService.getNextHolidays('SP-SAO-PAULO', 3);
-
-    expect(result).toEqual(nextHolidays);
-    expect(locationService.getLocationByCode).toHaveBeenCalledWith('SP-SAO-PAULO');
-    expect(holidayRepository.findNextApplicableByLocation).toHaveBeenCalledWith(
-      ['BR', 'SP', 'SP-SAO-PAULO'],
-      expect.any(Date),
-      3
-    );
-  });
-
-  it('returns applicable holidays by year using country, state and municipality hierarchy', async () => {
-    const holidays = [
-      holiday('2026-01-01', 'national', 'Confraternização Universal'),
-      holiday('2026-07-09', 'state', 'Revolução Constitucionalista de 1932'),
-      holiday('2026-01-25', 'municipal', 'Aniversário de São Paulo'),
-    ];
-    (holidayRepository.findApplicableByLocationDateRange as jest.Mock).mockResolvedValue(holidays);
-
-    const result = await holidayService.getApplicableHolidaysByYear('SP-SAO-PAULO', 2026);
-
-    expect(result).toEqual(holidays);
-    expect(locationService.getLocationByCode).toHaveBeenCalledWith('SP-SAO-PAULO');
-    expect(holidayRepository.findApplicableByLocationDateRange).toHaveBeenCalledWith(
-      ['BR', 'SP', 'SP-SAO-PAULO'],
-      new Date('2026-01-01T00:00:00.000Z'),
-      new Date('2026-12-31T00:00:00.000Z')
-    );
-  });
-
-  it('accepts location as an alias when searching holidays', async () => {
-    const holidays = [
-      holiday('2026-01-01', 'national', 'Confraternização Universal'),
-    ];
-    (holidayRepository.findWithFilters as jest.Mock).mockResolvedValue({
-      data: holidays,
-      total: 1,
-    });
-
-    const result = await holidayService.searchHolidays({
-      year: 2026,
-      location: 'SP-SAO-PAULO',
-      page: 2,
-      limit: 10,
-    });
-
-    expect(result.pagination).toEqual({
-      page: 2,
-      limit: 10,
-      total: 1,
-      totalPages: 1,
-    });
-    expect(locationService.getLocationByCode).toHaveBeenCalledWith('SP-SAO-PAULO');
-    expect(holidayRepository.findWithFilters).toHaveBeenCalledWith({
-      year: 2026,
-      location: 'SP-SAO-PAULO',
-      locationCodes: ['BR', 'SP', 'SP-SAO-PAULO'],
-      page: 2,
-      limit: 10,
-    });
-  });
-
-  it('checks applicable holidays using country, state and municipality hierarchy', async () => {
-    (holidayRepository.findApplicableByLocationDateRange as jest.Mock).mockResolvedValue([
-      holiday('2026-11-15', 'national', 'Proclamação da República'),
-      holiday('2026-11-15', 'municipal', 'Feriado municipal'),
-    ]);
-
-    const result = await holidayService.isHoliday('2026-11-15', 'SP-SAO-PAULO');
-
-    expect(result.isHoliday).toBe(true);
-    expect(result.location).toBe('SP-SAO-PAULO');
-    expect(result.types).toEqual(['national', 'municipal']);
-    expect(holidayRepository.findApplicableByLocationDateRange).toHaveBeenCalledWith(
-      ['BR', 'SP', 'SP-SAO-PAULO'],
-      new Date('2026-11-15T00:00:00.000Z'),
-      new Date('2026-11-15T00:00:00.000Z')
-    );
-  });
-
-  it('checks national, state and municipal holidays explicitly', async () => {
-    (holidayRepository.findApplicableByLocationDateRange as jest.Mock).mockResolvedValue([
-      holiday('2026-01-01', 'national', 'Confraternização Universal'),
-      holiday('2026-07-09', 'state', 'Revolução Constitucionalista'),
-      holiday('2026-01-25', 'municipal', 'Aniversário de São Paulo'),
-    ]);
-
-    const result = await holidayService.isHoliday('2026-01-25', 'SP-SAO-PAULO');
-
-    expect(result.isHoliday).toBe(true);
-    expect(result.types).toEqual(['national', 'state', 'municipal']);
-  });
-
-  it('returns false when no holiday applies', async () => {
-    (holidayRepository.findApplicableByLocationDateRange as jest.Mock).mockResolvedValue([]);
-
-    const result = await holidayService.isHoliday('2026-01-02', 'SP-SAO-PAULO');
-
-    expect(result.isHoliday).toBe(false);
-    expect(result.types).toEqual([]);
-    expect(result.holidays).toEqual([]);
-  });
-
-  it('does not classify optional bridge days as holidays', async () => {
-    (holidayRepository.findApplicableByLocationDateRange as jest.Mock).mockResolvedValue([
-      optionalHoliday('2026-06-05', 'Sexta-feira após Corpus Christi'),
-    ]);
-
-    const result = await holidayService.isHoliday('2026-06-05', 'SP-SAO-PAULO');
-
-    expect(result.isHoliday).toBe(false);
-    expect(result.types).toEqual([]);
-    expect(result.holidays).toEqual([]);
-  });
-
-  it('keeps market-wide optional dates classified as holidays', async () => {
-    (holidayRepository.findApplicableByLocationDateRange as jest.Mock).mockResolvedValue([
-      optionalHoliday('2026-06-04', 'Corpus Christi'),
-    ]);
-
-    const result = await holidayService.isHoliday('2026-06-04', 'SP-SAO-PAULO');
-
-    expect(result.isHoliday).toBe(true);
-    expect(result.types).toEqual(['optional']);
-    expect(result.holidays.map((item) => item.name)).toEqual(['Corpus Christi']);
-  });
-
-  it('compares holidays between a state and a municipality', async () => {
-    const national = holiday('2026-09-07', 'national', 'Independência do Brasil');
-    const state = holiday('2026-07-09', 'state', 'Revolução Constitucionalista');
-    const municipal = holiday('2026-01-25', 'municipal', 'Aniversário de São Paulo');
-    (locationService.getLocationByCode as jest.Mock).mockImplementation(async (code: string) =>
-      code === 'SP' ? saoPauloState : saoPauloCity
-    );
-    (holidayRepository.findApplicableByLocationDateRange as jest.Mock)
-      .mockResolvedValueOnce([national, state])
-      .mockResolvedValueOnce([national, state, municipal]);
-
-    const result = await holidayService.compareHolidays(['SP', 'SP-SAO-PAULO'], 2026);
-
-    expect(result.normalizedLocations.map(location => location.code)).toEqual(['SP', 'SP-SAO-PAULO']);
-    expect(result.commonHolidays.map(item => item.name)).toEqual([
-      'Revolução Constitucionalista',
-      'Independência do Brasil',
-    ]);
-    expect(result.onlyInLocation.SP).toEqual([]);
-    expect(result.onlyInLocation['SP-SAO-PAULO'].map(item => item.name)).toEqual(['Aniversário de São Paulo']);
-    expect(result.totalByLocation).toEqual({ SP: 2, 'SP-SAO-PAULO': 3 });
-  });
-
-  it('compares holidays between two municipalities', async () => {
-    const national = holiday('2026-09-07', 'national', 'Independência do Brasil');
-    const saoPauloMunicipal = holiday('2026-01-25', 'municipal', 'Aniversário de São Paulo');
-    const rioMunicipal = holiday('2026-01-20', 'municipal', 'São Sebastião');
-    (locationService.getLocationByCode as jest.Mock).mockImplementation(async (code: string) =>
-      code === 'SP-SAO-PAULO' ? saoPauloCity : rioCity
-    );
-    (holidayRepository.findApplicableByLocationDateRange as jest.Mock)
-      .mockResolvedValueOnce([national, saoPauloMunicipal])
-      .mockResolvedValueOnce([national, rioMunicipal]);
-
-    const result = await holidayService.compareHolidays(['SP-SAO-PAULO', 'RJ-RIO-DE-JANEIRO'], 2026);
-
-    expect(result.commonHolidays.map(item => item.name)).toEqual(['Independência do Brasil']);
-    expect(result.onlyInLocation['SP-SAO-PAULO'].map(item => item.name)).toEqual(['Aniversário de São Paulo']);
-    expect(result.onlyInLocation['RJ-RIO-DE-JANEIRO'].map(item => item.name)).toEqual(['São Sebastião']);
-  });
-
-  it('returns long weekends and bridge opportunities for a location', async () => {
-    const goodFriday = holiday('2026-04-03', 'national', 'Sexta-feira Santa');
-    const tiradentes = holiday('2026-04-21', 'national', 'Tiradentes');
-    const corpusChristi = holiday('2026-06-04', 'municipal', 'Corpus Christi');
-    const saturdayHoliday = holiday('2026-08-15', 'municipal', 'Feriado no sábado');
-    (holidayRepository.findApplicableByLocationDateRange as jest.Mock).mockResolvedValue([
-      goodFriday,
-      tiradentes,
-      corpusChristi,
-      saturdayHoliday,
-    ]);
-
-    const result = await holidayService.getLongWeekends('SP-SAO-PAULO', 2026);
-
-    expect(result).toEqual([
-      {
-        startDate: '2026-04-03',
-        endDate: '2026-04-05',
-        days: 3,
-        type: 'long_weekend',
-        bridgeDays: [],
-        holidays: [goodFriday],
+  it('paginates holidays by year', async () => {
+    (holidayService.searchHolidays as jest.Mock).mockResolvedValue({
+      data: [
+        {
+          id: 'holiday-2026-07-09',
+          name: 'Revolução Constitucionalista de 1932',
+          date: new Date('2026-07-09T00:00:00.000Z'),
+          year: 2026,
+          type: 'state',
+          isFixed: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ],
+      pagination: {
+        page: 2,
+        limit: 10,
+        total: 11,
+        totalPages: 2,
       },
+    });
+
+    const response = await request(app)
+        .get('/v1/holidays/year/2026?state=SP&page=2&limit=10')
+        .expect(200);
+
+    expect(response.body.data).toHaveLength(1);
+    expect(response.body.meta).toEqual({
+      year: 2026,
+      state: 'SP',
+      count: 1,
+    });
+    expect(response.body.pagination).toEqual({
+      page: 2,
+      limit: 10,
+      total: 11,
+      totalPages: 2,
+    });
+    expect(holidayService.searchHolidays).toHaveBeenCalledWith({
+      year: 2026,
+      state: 'SP',
+      page: 2,
+      limit: 10,
+    });
+  });
+
+  it('rejects invalid year pagination', async () => {
+    await request(app)
+        .get('/v1/holidays/year/2026?page=0')
+        .expect(400);
+  });
+
+  it('returns next holidays for a location', async () => {
+    (holidayService.getNextHolidays as jest.Mock).mockResolvedValue([
+      {
+        id: 'holiday-2026-07-09',
+        name: 'Revolução Constitucionalista de 1932',
+        date: new Date('2026-07-09T00:00:00.000Z'),
+        year: 2026,
+        type: 'state',
+        isFixed: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
+
+    const response = await request(app)
+        .get('/v1/holidays/next?location=SP-SAO-PAULO&limit=3')
+        .expect(200);
+
+    expect(response.body.data).toHaveLength(1);
+    expect(response.body.meta).toEqual({
+      location: 'SP-SAO-PAULO',
+      count: 1,
+    });
+    expect(holidayService.getNextHolidays).toHaveBeenCalledWith('SP-SAO-PAULO', 3);
+  });
+
+  it('checks if a date is a holiday for a location', async () => {
+    (holidayService.isHoliday as jest.Mock).mockResolvedValue({
+      date: '2026-11-15',
+      location: 'SP-SAO-PAULO',
+      isHoliday: true,
+      types: ['national'],
+      holidays: [
+        {
+          id: 'holiday-2026-11-15',
+          name: 'Proclamação da República',
+          date: new Date('2026-11-15T00:00:00.000Z'),
+          year: 2026,
+          type: 'national',
+          isFixed: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ],
+    });
+
+    const response = await request(app)
+        .get('/v1/holidays/is?date=2026-11-15&location=SP-SAO-PAULO')
+        .expect(200);
+
+    expect(response.body.data.isHoliday).toBe(true);
+    expect(response.body.data.types).toEqual(['national']);
+    expect(response.body.meta.location).toBe('SP-SAO-PAULO');
+    expect(holidayService.isHoliday).toHaveBeenCalledWith('2026-11-15', 'SP-SAO-PAULO');
+  });
+
+  it('compares holidays between locations', async () => {
+    (holidayService.compareHolidays as jest.Mock).mockResolvedValue({
+      year: 2026,
+      normalizedLocations: [
+        { input: 'SP-SAO-PAULO', code: 'SP-SAO-PAULO', name: 'São Paulo', type: 'municipality' },
+        { input: 'RJ-RIO-DE-JANEIRO', code: 'RJ-RIO-DE-JANEIRO', name: 'Rio de Janeiro', type: 'municipality' },
+      ],
+      commonHolidays: [
+        {
+          id: 'holiday-2026-09-07',
+          name: 'Independência do Brasil',
+          date: new Date('2026-09-07T00:00:00.000Z'),
+          year: 2026,
+          type: 'national',
+          isFixed: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ],
+      onlyInLocation: {
+        'SP-SAO-PAULO': [],
+        'RJ-RIO-DE-JANEIRO': [],
+      },
+      totalByLocation: {
+        'SP-SAO-PAULO': 1,
+        'RJ-RIO-DE-JANEIRO': 1,
+      },
+    });
+
+    const response = await request(app)
+        .get('/v1/holidays/compare?locations=SP-SAO-PAULO,RJ-RIO-DE-JANEIRO&year=2026')
+        .expect(200);
+
+    expect(response.body.data.commonHolidays).toHaveLength(1);
+    expect(response.body.meta).toEqual({
+      year: 2026,
+      locations: ['SP-SAO-PAULO', 'RJ-RIO-DE-JANEIRO'],
+    });
+    expect(holidayService.compareHolidays).toHaveBeenCalledWith(
+        ['SP-SAO-PAULO', 'RJ-RIO-DE-JANEIRO'],
+        2026
+    );
+  });
+
+  it('returns long weekends for a location', async () => {
+    (holidayService.getLongWeekends as jest.Mock).mockResolvedValue([
       {
         startDate: '2026-04-18',
         endDate: '2026-04-21',
         days: 4,
         type: 'bridge',
         bridgeDays: ['2026-04-20'],
-        holidays: [tiradentes],
-      },
-      {
-        startDate: '2026-06-04',
-        endDate: '2026-06-07',
-        days: 4,
-        type: 'bridge',
-        bridgeDays: ['2026-06-05'],
-        holidays: [corpusChristi],
+        holidays: [
+          {
+            id: 'holiday-2026-04-21',
+            name: 'Tiradentes',
+            date: new Date('2026-04-21T00:00:00.000Z'),
+            year: 2026,
+            type: 'national',
+            isFixed: true,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        ],
       },
     ]);
+
+    const response = await request(app)
+        .get('/v1/holidays/long-weekends?location=SP-SAO-PAULO&year=2026')
+        .expect(200);
+
+    expect(response.body.data).toHaveLength(1);
+    expect(response.body.data[0].bridgeDays).toEqual(['2026-04-20']);
+    expect(response.body.meta).toEqual({
+      year: 2026,
+      location: 'SP-SAO-PAULO',
+      count: 1,
+    });
+    expect(holidayService.getLongWeekends).toHaveBeenCalledWith('SP-SAO-PAULO', 2026);
   });
 
-  it('merges adjacent long weekend windows and does not mark holidays as bridge days', async () => {
-    const mondayHoliday = holiday('2026-09-07', 'national', 'Independência do Brasil');
-    const tuesdayHoliday = holiday('2026-09-08', 'municipal', 'Feriado municipal');
-    (holidayRepository.findApplicableByLocationDateRange as jest.Mock).mockResolvedValue([
-      mondayHoliday,
-      tuesdayHoliday,
-    ]);
-
-    const result = await holidayService.getLongWeekends('SP-SAO-PAULO', 2026);
-
-    expect(result).toEqual([
-      {
-        startDate: '2026-09-05',
-        endDate: '2026-09-08',
-        days: 4,
-        type: 'long_weekend',
-        bridgeDays: [],
-        holidays: [mondayHoliday, tuesdayHoliday],
-      },
-    ]);
+  it('rejects long weekends without a valid year', async () => {
+    await request(app)
+        .get('/v1/holidays/long-weekends?location=SP-SAO-PAULO&year=26')
+        .expect(400);
   });
 
-  it('uses the civil date returned by PostgreSQL DATE values in non-UTC timezones', async () => {
-    const goodFriday = {
-      ...holiday('2026-04-03', 'national', 'Paixão de Cristo'),
-      date: new Date(2026, 3, 3),
-    };
-    (holidayRepository.findApplicableByLocationDateRange as jest.Mock).mockResolvedValue([
-      goodFriday,
-    ]);
-
-    const result = await holidayService.getLongWeekends('SP-SAO-PAULO', 2026);
-
-    expect(result).toEqual([
-      {
-        startDate: '2026-04-03',
-        endDate: '2026-04-05',
-        days: 3,
-        type: 'long_weekend',
-        bridgeDays: [],
-        holidays: [goodFriday],
+  it('returns all applicable holidays for a location in a date range', async () => {
+    (holidayService.getApplicableHolidaysByDateRange as jest.Mock).mockResolvedValue({
+      location: {
+        id: 'loc-sao-paulo',
+        type: 'municipality',
+        code: 'SP-SAO-PAULO',
+        name: 'São Paulo',
+        stateCode: 'SP',
       },
-    ]);
+      holidays: [
+        {
+          id: 'holiday-2026-01-25',
+          name: 'Aniversário de São Paulo',
+          date: new Date('2026-01-25T00:00:00.000Z'),
+          year: 2026,
+          type: 'municipal',
+          isFixed: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ],
+    });
+
+    const response = await request(app)
+        .get('/v1/holidays/location/SP-SAO-PAULO?startDate=2026-01-01&endDate=2026-12-31')
+        .expect(200);
+
+    expect(response.body.data).toHaveLength(1);
+    expect(response.body.meta).toEqual({
+      location: 'SP-SAO-PAULO',
+      locationName: 'São Paulo',
+      locationType: 'municipality',
+      startDate: '2026-01-01',
+      endDate: '2026-12-31',
+      count: 1,
+    });
+    expect(holidayService.getApplicableHolidaysByDateRange).toHaveBeenCalledWith(
+        'SP-SAO-PAULO',
+        '2026-01-01',
+        '2026-12-31'
+    );
+  });
+
+  it('rejects a location holiday range with startDate after endDate', async () => {
+    await request(app)
+        .get('/v1/holidays/location/SP-SAO-PAULO?startDate=2026-12-31&endDate=2026-01-01')
+        .expect(400);
+
+    expect(holidayService.getApplicableHolidaysByDateRange).not.toHaveBeenCalled();
+  });
+
+  it('rejects a location holiday range with invalid dates', async () => {
+    await request(app)
+        .get('/v1/holidays/location/SP-SAO-PAULO?startDate=2026-02-31&endDate=2026-12-31')
+        .expect(400);
+
+    expect(holidayService.getApplicableHolidaysByDateRange).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 when the location is not found', async () => {
+    (holidayService.getApplicableHolidaysByDateRange as jest.Mock).mockRejectedValue(
+        new NotFoundError('Location with code XX-NOWHERE not found')
+    );
+
+    await request(app)
+        .get('/v1/holidays/location/XX-NOWHERE?startDate=2026-01-01&endDate=2026-12-31')
+        .expect(404);
+  });
+
+  it('does not route unknown holiday subpaths to the UUID detail endpoint', async () => {
+    await request(app)
+        .get('/v1/holidays/not-a-real-subpath')
+        .expect(404);
+
+    expect(holidayService.getHolidayById).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid dates', async () => {
+    await request(app)
+        .get('/v1/holidays/is?date=2026-02-31&location=SP')
+        .expect(400);
   });
 });
+

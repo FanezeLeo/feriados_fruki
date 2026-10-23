@@ -216,6 +216,43 @@ paths:
                 $ref: "#/components/schemas/HolidayArrayResponse"
         "400":
           $ref: "#/components/responses/ValidationError"
+  /v1/holidays/location/{location}:
+    get:
+      tags: [Holidays]
+      summary: List all applicable holidays for a location in a date range
+      description: Returns every national, state and municipal holiday that applies to the location in the given range, without pagination.
+      parameters:
+        - name: location
+          in: path
+          required: true
+          schema:
+            type: string
+            example: SP-SAO-PAULO
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+            example: 2026-01-01
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+            example: 2026-12-31
+      responses:
+        "200":
+          description: Applicable holidays for the location in the date range
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HolidayArrayResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /v1/holidays/ical:
     get:
       tags: [Holidays]
@@ -1272,3 +1309,4 @@ components:
                 type: string
         pagination:
           $ref: "#/components/schemas/Pagination"
+

@@ -7,8 +7,8 @@ async function request(path, { expectedStatus = 200, validate } = {}) {
   const response = await fetch(url);
   const contentType = response.headers.get('content-type') || '';
   const body = contentType.includes('application/json')
-    ? await response.json()
-    : await response.text();
+      ? await response.json()
+      : await response.text();
 
   if (response.status !== expectedStatus) {
     throw new Error(`${path} returned ${response.status}, expected ${expectedStatus}`);
@@ -47,9 +47,19 @@ const checks = [
       assert(body.status === 'success', 'holidays response should be successful');
       assert(Array.isArray(body.data), 'holidays data should be an array');
       assert(
-        body.data.some((holiday) => holiday.date?.startsWith('2026-01-01')),
-        'holidays should include 2026-01-01'
+          body.data.some((holiday) => holiday.date?.startsWith('2026-01-01')),
+          'holidays should include 2026-01-01'
       );
+    },
+  },
+  {
+    name: 'holidays by location and range',
+    path: '/v1/holidays/location/SP-SAO-PAULO?startDate=2026-01-01&endDate=2026-12-31',
+    validate: (body) => {
+      assert(body.status === 'success', 'location holidays response should be successful');
+      assert(Array.isArray(body.data), 'location holidays data should be an array');
+      assert(body.meta.location === 'SP-SAO-PAULO', 'location holidays meta should echo the location');
+      assert(body.meta.count === body.data.length, 'location holidays meta count should match data length');
     },
   },
   {
@@ -82,8 +92,8 @@ const checks = [
     path: '/v1/holidays/ical?location=BR&year=2026',
     validate: (body, response) => {
       assert(
-        response.headers.get('content-type')?.includes('text/calendar'),
-        'iCal response should use text/calendar'
+          response.headers.get('content-type')?.includes('text/calendar'),
+          'iCal response should use text/calendar'
       );
       assert(body.includes('BEGIN:VCALENDAR'), 'iCal response should include BEGIN:VCALENDAR');
     },
@@ -113,3 +123,4 @@ main().catch((error) => {
   console.error(`Smoke tests failed: ${error.message}`);
   process.exit(1);
 });
+

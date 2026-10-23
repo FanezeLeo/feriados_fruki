@@ -132,6 +132,23 @@ export const swaggerDocument = {
         },
       },
     },
+    '/v1/holidays/location/{location}': {
+      get: {
+        tags: ['Holidays'],
+        summary: 'Lista todos os feriados aplicaveis a uma localidade em um intervalo',
+        description: 'Retorna feriados nacionais, estaduais e municipais aplicaveis a localidade no intervalo informado, sem paginacao.',
+        parameters: [
+          { name: 'location', in: 'path', required: true, schema: { type: 'string', example: 'SP-SAO-PAULO' } },
+          { name: 'startDate', in: 'query', required: true, schema: { type: 'string', format: 'date', example: '2026-01-01' } },
+          { name: 'endDate', in: 'query', required: true, schema: { type: 'string', format: 'date', example: '2026-12-31' } },
+        ],
+        responses: {
+          '200': { description: 'Feriados aplicaveis no intervalo' },
+          '400': { description: 'Parametros invalidos' },
+          '404': { description: 'Localidade nao encontrada' },
+        },
+      },
+    },
     '/v1/holidays/year/{year}': {
       get: {
         tags: ['Holidays'],
@@ -282,3 +299,4 @@ export const swaggerDocument = {
     },
   },
 };
+
