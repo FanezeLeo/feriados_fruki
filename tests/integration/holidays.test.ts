@@ -2,6 +2,7 @@ import request from 'supertest';
 import { createApp } from '../../src/app';
 import { Application } from 'express';
 import { holidayService } from '../../src/services/holiday.service';
+import { NotFoundError } from '../../src/utils/errors';
 
 jest.mock('../../src/services/holiday.service');
 
@@ -39,8 +40,8 @@ describe('Holiday endpoints', () => {
     });
 
     const response = await request(app)
-      .get('/v1/holidays/year/2026?state=SP&page=2&limit=10')
-      .expect(200);
+        .get('/v1/holidays/year/2026?state=SP&page=2&limit=10')
+        .expect(200);
 
     expect(response.body.data).toHaveLength(1);
     expect(response.body.meta).toEqual({
@@ -64,8 +65,8 @@ describe('Holiday endpoints', () => {
 
   it('rejects invalid year pagination', async () => {
     await request(app)
-      .get('/v1/holidays/year/2026?page=0')
-      .expect(400);
+        .get('/v1/holidays/year/2026?page=0')
+        .expect(400);
   });
 
   it('returns next holidays for a location', async () => {
@@ -83,8 +84,8 @@ describe('Holiday endpoints', () => {
     ]);
 
     const response = await request(app)
-      .get('/v1/holidays/next?location=SP-SAO-PAULO&limit=3')
-      .expect(200);
+        .get('/v1/holidays/next?location=SP-SAO-PAULO&limit=3')
+        .expect(200);
 
     expect(response.body.data).toHaveLength(1);
     expect(response.body.meta).toEqual({
@@ -115,8 +116,8 @@ describe('Holiday endpoints', () => {
     });
 
     const response = await request(app)
-      .get('/v1/holidays/is?date=2026-11-15&location=SP-SAO-PAULO')
-      .expect(200);
+        .get('/v1/holidays/is?date=2026-11-15&location=SP-SAO-PAULO')
+        .expect(200);
 
     expect(response.body.data.isHoliday).toBe(true);
     expect(response.body.data.types).toEqual(['national']);
@@ -154,8 +155,8 @@ describe('Holiday endpoints', () => {
     });
 
     const response = await request(app)
-      .get('/v1/holidays/compare?locations=SP-SAO-PAULO,RJ-RIO-DE-JANEIRO&year=2026')
-      .expect(200);
+        .get('/v1/holidays/compare?locations=SP-SAO-PAULO,RJ-RIO-DE-JANEIRO&year=2026')
+        .expect(200);
 
     expect(response.body.data.commonHolidays).toHaveLength(1);
     expect(response.body.meta).toEqual({
@@ -163,8 +164,8 @@ describe('Holiday endpoints', () => {
       locations: ['SP-SAO-PAULO', 'RJ-RIO-DE-JANEIRO'],
     });
     expect(holidayService.compareHolidays).toHaveBeenCalledWith(
-      ['SP-SAO-PAULO', 'RJ-RIO-DE-JANEIRO'],
-      2026
+        ['SP-SAO-PAULO', 'RJ-RIO-DE-JANEIRO'],
+        2026
     );
   });
 
@@ -192,8 +193,8 @@ describe('Holiday endpoints', () => {
     ]);
 
     const response = await request(app)
-      .get('/v1/holidays/long-weekends?location=SP-SAO-PAULO&year=2026')
-      .expect(200);
+        .get('/v1/holidays/long-weekends?location=SP-SAO-PAULO&year=2026')
+        .expect(200);
 
     expect(response.body.data).toHaveLength(1);
     expect(response.body.data[0].bridgeDays).toEqual(['2026-04-20']);
@@ -207,21 +208,91 @@ describe('Holiday endpoints', () => {
 
   it('rejects long weekends without a valid year', async () => {
     await request(app)
-      .get('/v1/holidays/long-weekends?location=SP-SAO-PAULO&year=26')
-      .expect(400);
+        .get('/v1/holidays/long-weekends?location=SP-SAO-PAULO&year=26')
+        .expect(400);
+  });
+
+  it('returns all applicable holidays for a location in a date range', async () => {
+    (holidayService.getApplicableHolidaysByDateRange as jest.Mock).mockResolvedValue({
+      location: {
+        id: 'loc-sao-paulo',
+        type: 'municipality',
+        code: 'SP-SAO-PAULO',
+        name: 'São Paulo',
+        stateCode: 'SP',
+      },
+      holidays: [
+        {
+          id: 'holiday-2026-01-25',
+          name: 'Aniversário de São Paulo',
+          date: new Date('2026-01-25T00:00:00.000Z'),
+          year: 2026,
+          type: 'municipal',
+          isFixed: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ],
+    });
+
+    const response = await request(app)
+        .get('/v1/holidays/location/SP-SAO-PAULO?startDate=2026-01-01&endDate=2026-12-31')
+        .expect(200);
+
+    expect(response.body.data).toHaveLength(1);
+    expect(response.body.meta).toEqual({
+      location: 'SP-SAO-PAULO',
+      locationName: 'São Paulo',
+      locationType: 'municipality',
+      startDate: '2026-01-01',
+      endDate: '2026-12-31',
+      count: 1,
+    });
+    expect(holidayService.getApplicableHolidaysByDateRange).toHaveBeenCalledWith(
+        'SP-SAO-PAULO',
+        '2026-01-01',
+        '2026-12-31'
+    );
+  });
+
+  it('rejects a location holiday range with startDate after endDate', async () => {
+    await request(app)
+        .get('/v1/holidays/location/SP-SAO-PAULO?startDate=2026-12-31&endDate=2026-01-01')
+        .expect(400);
+
+    expect(holidayService.getApplicableHolidaysByDateRange).not.toHaveBeenCalled();
+  });
+
+  it('rejects a location holiday range with invalid dates', async () => {
+    await request(app)
+        .get('/v1/holidays/location/SP-SAO-PAULO?startDate=2026-02-31&endDate=2026-12-31')
+        .expect(400);
+
+    expect(holidayService.getApplicableHolidaysByDateRange).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 when the location is not found', async () => {
+    (holidayService.getApplicableHolidaysByDateRange as jest.Mock).mockRejectedValue(
+        new NotFoundError('Location with code XX-NOWHERE not found')
+    );
+
+    await request(app)
+        .get('/v1/holidays/location/XX-NOWHERE?startDate=2026-01-01&endDate=2026-12-31')
+        .expect(404);
   });
 
   it('does not route unknown holiday subpaths to the UUID detail endpoint', async () => {
     await request(app)
-      .get('/v1/holidays/not-a-real-subpath')
-      .expect(404);
+        .get('/v1/holidays/not-a-real-subpath')
+        .expect(404);
 
     expect(holidayService.getHolidayById).not.toHaveBeenCalled();
   });
 
   it('rejects invalid dates', async () => {
     await request(app)
-      .get('/v1/holidays/is?date=2026-02-31&location=SP')
-      .expect(400);
+        .get('/v1/holidays/is?date=2026-02-31&location=SP')
+        .expect(400);
   });
 });
+

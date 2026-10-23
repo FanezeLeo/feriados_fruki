@@ -5,6 +5,7 @@ import {
   Holiday,
   HolidayCompareResult,
   HolidayCheckResult,
+  HolidayLocationRangeResult,
   HolidayQueryParams,
   Location,
   LongWeekendResult,
@@ -45,8 +46,8 @@ function daysBetweenInclusive(from: Date, to: Date): number {
 
 function holidayDateKey(holiday: Holiday): string {
   return holiday.date instanceof Date
-    ? formatLocalIsoDate(holiday.date)
-    : String(holiday.date).slice(0, 10);
+      ? formatLocalIsoDate(holiday.date)
+      : String(holiday.date).slice(0, 10);
 }
 
 function applicableLocationCodes(location: Location): string[] {
@@ -86,9 +87,9 @@ export class HolidayService {
       const start = dateFromIsoDate(`${year}-01-01`);
       const end = dateFromIsoDate(`${year}-12-31`);
       holidays = await holidayRepository.findApplicableByLocationDateRange(
-        applicableLocationCodes(location),
-        start,
-        end
+          applicableLocationCodes(location),
+          start,
+          end
       );
     } else {
       holidays = await holidayRepository.findByYear(year);
@@ -152,9 +153,9 @@ export class HolidayService {
     const location = await locationService.getLocationByCode(locationCode);
 
     return holidayRepository.findNextApplicableByLocation(
-      applicableLocationCodes(location),
-      today,
-      limit
+        applicableLocationCodes(location),
+        today,
+        limit
     );
   }
 
@@ -164,19 +165,34 @@ export class HolidayService {
     const end = dateFromIsoDate(`${year}-12-31`);
 
     return holidayRepository.findApplicableByLocationDateRange(
-      applicableLocationCodes(location),
-      start,
-      end
+        applicableLocationCodes(location),
+        start,
+        end
     );
+  }
+
+  async getApplicableHolidaysByDateRange(
+      locationCode: string,
+      startDate: string,
+      endDate: string
+  ): Promise<HolidayLocationRangeResult> {
+    const location = await locationService.getLocationByCode(locationCode);
+    const holidays = await holidayRepository.findApplicableByLocationDateRange(
+        applicableLocationCodes(location),
+        dateFromIsoDate(startDate),
+        dateFromIsoDate(endDate)
+    );
+
+    return { location, holidays };
   }
 
   async isHoliday(date: string, locationCode: string): Promise<HolidayCheckResult> {
     const target = dateFromIsoDate(date);
     const location = await locationService.getLocationByCode(locationCode);
     const holidays = await holidayRepository.findApplicableByLocationDateRange(
-      applicableLocationCodes(location),
-      target,
-      target
+        applicableLocationCodes(location),
+        target,
+        target
     );
     const holidayChecks = holidays.filter(blocksBusinessDay);
     const types = [...new Set(holidayChecks.map((holiday) => holiday.type))];
@@ -197,10 +213,10 @@ export class HolidayService {
     }
 
     const locations = await Promise.all(
-      uniqueInputs.map(async (input) => ({
-        input,
-        location: await locationService.getLocationByCode(input),
-      }))
+        uniqueInputs.map(async (input) => ({
+          input,
+          location: await locationService.getLocationByCode(input),
+        }))
     );
     const normalizedCodes = new Set(locations.map(item => item.location.code));
     if (normalizedCodes.size < 2) {
@@ -210,21 +226,21 @@ export class HolidayService {
     const start = dateFromIsoDate(`${year}-01-01`);
     const end = dateFromIsoDate(`${year}-12-31`);
     const holidaysByLocation = await Promise.all(
-      locations.map(async ({ location }) => ({
-        location,
-        holidays: await holidayRepository.findApplicableByLocationDateRange(
-          applicableLocationCodes(location),
-          start,
-          end
-        ),
-      }))
+        locations.map(async ({ location }) => ({
+          location,
+          holidays: await holidayRepository.findApplicableByLocationDateRange(
+              applicableLocationCodes(location),
+              start,
+              end
+          ),
+        }))
     );
 
     const holidayIdsByLocation = holidaysByLocation.map(({ holidays }) =>
-      new Set(holidays.map(holiday => holiday.id))
+        new Set(holidays.map(holiday => holiday.id))
     );
     const commonIds = holidayIdsByLocation.reduce((common, ids) =>
-      new Set([...common].filter(id => ids.has(id)))
+        new Set([...common].filter(id => ids.has(id)))
     );
 
     const sortHolidays = (holidays: Holiday[]) => [...holidays].sort((a, b) => {
@@ -233,7 +249,7 @@ export class HolidayService {
     });
 
     const commonHolidays = sortHolidays(
-      holidaysByLocation[0].holidays.filter(holiday => commonIds.has(holiday.id))
+        holidaysByLocation[0].holidays.filter(holiday => commonIds.has(holiday.id))
     );
     const onlyInLocation: Record<string, Holiday[]> = {};
     const totalByLocation: Record<string, number> = {};
@@ -269,11 +285,11 @@ export class HolidayService {
     const results = new Map<string, LongWeekendResult>();
 
     const addResult = (
-      startDate: Date,
-      endDate: Date,
-      type: LongWeekendResult['type'],
-      bridgeDays: string[],
-      holidayDate: string
+        startDate: Date,
+        endDate: Date,
+        type: LongWeekendResult['type'],
+        bridgeDays: string[],
+        holidayDate: string
     ) => {
       const start = formatIsoDate(startDate);
       const end = formatIsoDate(endDate);
@@ -281,9 +297,9 @@ export class HolidayService {
       const actualBridgeDays = bridgeDays.filter((day) => !holidaysByDate.has(day));
       const resultType = actualBridgeDays.length > 0 ? type : 'long_weekend';
       const windowHolidays = [...holidaysByDate.entries()]
-        .filter(([date]) => date >= start && date <= end)
-        .flatMap(([, items]) => items)
-        .sort((a, b) => holidayDateKey(a).localeCompare(holidayDateKey(b)));
+          .filter(([date]) => date >= start && date <= end)
+          .flatMap(([, items]) => items)
+          .sort((a, b) => holidayDateKey(a).localeCompare(holidayDateKey(b)));
       const existing = results.get(key);
 
       if (existing) {
@@ -325,53 +341,53 @@ export class HolidayService {
         addResult(addUtcDays(holidayDate, -2), holidayDate, 'long_weekend', [], date);
       } else if (weekday === 2) {
         addResult(
-          addUtcDays(holidayDate, -3),
-          holidayDate,
-          'bridge',
-          [formatIsoDate(addUtcDays(holidayDate, -1))],
-          date
+            addUtcDays(holidayDate, -3),
+            holidayDate,
+            'bridge',
+            [formatIsoDate(addUtcDays(holidayDate, -1))],
+            date
         );
       } else if (weekday === 4) {
         addResult(
-          holidayDate,
-          addUtcDays(holidayDate, 3),
-          'bridge',
-          [formatIsoDate(addUtcDays(holidayDate, 1))],
-          date
+            holidayDate,
+            addUtcDays(holidayDate, 3),
+            'bridge',
+            [formatIsoDate(addUtcDays(holidayDate, 1))],
+            date
         );
       }
     }
 
     return [...results.values()]
-      .sort((a, b) => a.startDate.localeCompare(b.startDate))
-      .reduce<LongWeekendResult[]>((merged, current) => {
-        const previous = merged[merged.length - 1];
+        .sort((a, b) => a.startDate.localeCompare(b.startDate))
+        .reduce<LongWeekendResult[]>((merged, current) => {
+          const previous = merged[merged.length - 1];
 
-        if (!previous || current.startDate > previous.endDate) {
-          merged.push(current);
+          if (!previous || current.startDate > previous.endDate) {
+            merged.push(current);
+            return merged;
+          }
+
+          const holidayIds = new Set(previous.holidays.map((holiday) => holiday.id));
+          previous.endDate = current.endDate > previous.endDate ? current.endDate : previous.endDate;
+          previous.days = daysBetweenInclusive(
+              dateFromIsoDate(previous.startDate),
+              dateFromIsoDate(previous.endDate)
+          );
+          previous.bridgeDays = [...new Set([...previous.bridgeDays, ...current.bridgeDays])].sort();
+          previous.type = previous.bridgeDays.length > 0 ? 'bridge' : 'long_weekend';
+          previous.holidays = [
+            ...previous.holidays,
+            ...current.holidays.filter((holiday) => !holidayIds.has(holiday.id)),
+          ].sort((a, b) => holidayDateKey(a).localeCompare(holidayDateKey(b)));
+
           return merged;
-        }
-
-        const holidayIds = new Set(previous.holidays.map((holiday) => holiday.id));
-        previous.endDate = current.endDate > previous.endDate ? current.endDate : previous.endDate;
-        previous.days = daysBetweenInclusive(
-          dateFromIsoDate(previous.startDate),
-          dateFromIsoDate(previous.endDate)
-        );
-        previous.bridgeDays = [...new Set([...previous.bridgeDays, ...current.bridgeDays])].sort();
-        previous.type = previous.bridgeDays.length > 0 ? 'bridge' : 'long_weekend';
-        previous.holidays = [
-          ...previous.holidays,
-          ...current.holidays.filter((holiday) => !holidayIds.has(holiday.id)),
-        ].sort((a, b) => holidayDateKey(a).localeCompare(holidayDateKey(b)));
-
-        return merged;
-      }, []);
+        }, []);
   }
 
   async createHoliday(
-    holidayData: Omit<Holiday, 'id' | 'createdAt' | 'updatedAt'>,
-    locationIds: string[]
+      holidayData: Omit<Holiday, 'id' | 'createdAt' | 'updatedAt'>,
+      locationIds: string[]
   ): Promise<Holiday> {
     const holiday = await holidayRepository.create(holidayData);
 
@@ -403,3 +419,4 @@ export class HolidayService {
 }
 
 export const holidayService = new HolidayService();
+

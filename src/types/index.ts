@@ -1,13 +1,13 @@
 export type LocationType = 'country' | 'state' | 'municipality';
 export type HolidayType = 'national' | 'state' | 'municipal' | 'optional';
 export type ImpactEventCategory =
-  | 'sports'
-  | 'civic'
-  | 'infrastructure'
-  | 'cultural'
-  | 'commerce'
-  | 'weather'
-  | 'other';
+    | 'sports'
+    | 'civic'
+    | 'infrastructure'
+    | 'cultural'
+    | 'commerce'
+    | 'weather'
+    | 'other';
 export type ImpactEventLevel = 'low' | 'medium' | 'high' | 'critical';
 export type ImpactEventScope = 'national' | 'state' | 'municipality';
 export type ImpactEventStatus = 'scheduled' | 'tentative' | 'cancelled';
@@ -110,6 +110,11 @@ export interface HolidayCheckResult {
   location: string;
   isHoliday: boolean;
   types: HolidayType[];
+  holidays: Holiday[];
+}
+
+export interface HolidayLocationRangeResult {
+  location: Location;
   holidays: Holiday[];
 }
 
@@ -233,3 +238,4 @@ export interface ApiError {
   code?: string;
   details?: unknown;
 }
+

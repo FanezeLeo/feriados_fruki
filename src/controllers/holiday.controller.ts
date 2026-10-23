@@ -53,21 +53,30 @@ const nextHolidaysQuerySchema = z.object({
 });
 
 const isoDateSchema = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected date in YYYY-MM-DD format')
-  .refine((value) => {
-    const date = new Date(`${value}T00:00:00.000Z`);
-    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
-  }, 'Invalid calendar date');
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected date in YYYY-MM-DD format')
+    .refine((value) => {
+      const date = new Date(`${value}T00:00:00.000Z`);
+      return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+    }, 'Invalid calendar date');
 
 const isHolidayQuerySchema = z.object({
   date: isoDateSchema,
   location: z.string().min(2),
 });
 
+const locationParamSchema = z.object({
+  location: z.string().min(2),
+});
+
+const locationRangeQuerySchema = z.object({
+  startDate: isoDateSchema,
+  endDate: isoDateSchema,
+});
+
 const compareHolidaysQuerySchema = z.object({
   locations: z.string().transform(value =>
-    value.split(',').map(location => location.trim()).filter(Boolean)
+      value.split(',').map(location => location.trim()).filter(Boolean)
   ).refine(locations => locations.length >= 2, 'At least two locations are required'),
   year: z.string().regex(/^\d{4}$/).transform(Number),
 });
@@ -162,13 +171,48 @@ export class HolidayController {
     }
   }
 
+  async getHolidaysByLocation(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { location } = locationParamSchema.parse(req.params);
+      const { startDate, endDate } = locationRangeQuerySchema.parse(req.query);
+
+      if (startDate > endDate) {
+        throw new BadRequestError(
+            'startDate must be before or equal to endDate',
+            'INVALID_DATE_RANGE'
+        );
+      }
+
+      const result = await holidayService.getApplicableHolidaysByDateRange(
+          location,
+          startDate,
+          endDate
+      );
+
+      res.json({
+        status: 'success',
+        data: result.holidays,
+        meta: {
+          location: result.location.code,
+          locationName: result.location.name,
+          locationType: result.location.type,
+          startDate,
+          endDate,
+          count: result.holidays.length,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getNextHolidays(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { location, limit } = nextHolidaysQuerySchema.parse(req.query);
 
       const holidays = await holidayService.getNextHolidays(
-        location,
-        typeof limit === 'string' ? parseInt(limit) : limit
+          location,
+          typeof limit === 'string' ? parseInt(limit) : limit
       );
 
       res.json({
@@ -242,11 +286,11 @@ export class HolidayController {
   async getHolidaysIcal(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { location, year } = z
-        .object({
-          location: z.string().min(2),
-          year: z.string().regex(/^\d{4}$/).transform(Number).optional(),
-        })
-        .parse(req.query);
+          .object({
+            location: z.string().min(2),
+            year: z.string().regex(/^\d{4}$/).transform(Number).optional(),
+          })
+          .parse(req.query);
 
       const targetYear = year ?? new Date().getFullYear();
       const holidays = await holidayService.getApplicableHolidaysByYear(location, targetYear);
@@ -267,3 +311,4 @@ export class HolidayController {
 }
 
 export const holidayController = new HolidayController();
+

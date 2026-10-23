@@ -46,6 +46,16 @@ router.get('/compare', (req, res, next) => holidayController.compareHolidays(req
 router.get('/range', (req, res, next) => holidayController.getHolidaysByDateRange(req, res, next));
 
 /**
+ * @route GET /api/v1/holidays/location/:location
+ * @description Get all applicable holidays for a location in a civil date range
+ * @param location - Location code (country, state UF or municipality code)
+ * @query startDate, endDate
+ */
+router.get('/location/:location', (req, res, next) =>
+    holidayController.getHolidaysByLocation(req, res, next)
+);
+
+/**
  * @route GET /api/v1/holidays/year/:year
  * @description Get all holidays for a specific year
  * @param year - Year in YYYY format
@@ -59,8 +69,9 @@ router.get('/year/:year', (req, res, next) => holidayController.getHolidaysByYea
  * @param id - Holiday UUID
  */
 router.get(
-  '/:id([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})',
-  (req, res, next) => holidayController.getHolidayById(req, res, next)
+    '/:id([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})',
+    (req, res, next) => holidayController.getHolidayById(req, res, next)
 );
 
 export default router;
+
