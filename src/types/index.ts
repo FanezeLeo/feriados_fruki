@@ -239,3 +239,7 @@ export interface ApiError {
   details?: unknown;
 }
 
+export interface ImpactEventLocationRangeResult {
+  location: Location;
+  events: ImpactEvent[];
+}
