@@ -6,7 +6,11 @@ const router = Router();
 router.get('/', (req, res, next) => impactEventController.searchImpactEvents(req, res, next));
 
 router.get('/next', (req, res, next) =>
-  impactEventController.getNextImpactEvents(req, res, next)
+    impactEventController.getNextImpactEvents(req, res, next)
+);
+
+router.get('/location/:location', (req, res, next) =>
+    impactEventController.getImpactEventsByLocation(req, res, next)
 );
 
 router.get('/:id', (req, res, next) => impactEventController.getImpactEventById(req, res, next));

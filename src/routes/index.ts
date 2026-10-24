@@ -18,7 +18,7 @@ const API_PREFIX = `/${config.apiVersion}`;
 router.use('/health', healthRoutes);
 
 router.get(`${API_PREFIX}/holidays/ical`, (req, res, next) =>
-  holidayController.getHolidaysIcal(req, res, next),
+    holidayController.getHolidaysIcal(req, res, next),
 );
 
 router.use(`${API_PREFIX}/holidays`, holidayRoutes);
@@ -28,7 +28,7 @@ router.use(`${API_PREFIX}/calendar`, calendarRoutes);
 router.use(`${API_PREFIX}/impact-events`, impactEventRoutes);
 
 router.get(`${API_PREFIX}/changelog.rss`, (req, res, next) =>
-  changelogController.rss(req, res, next),
+    changelogController.rss(req, res, next),
 );
 router.use(`${API_PREFIX}/changelog`, changelogRoutes);
 router.use(`${API_PREFIX}/data`, dataStatusRoutes);
