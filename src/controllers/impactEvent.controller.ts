@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { impactEventService } from '@services/impactEvent.service';
+import { BadRequestError } from '@utils/errors';
 
 const isoDateSchema = z
   .string()
@@ -39,6 +40,15 @@ const nextImpactEventsQuerySchema = z.object({
   path: ['limit'],
 });
 
+const locationParamSchema = z.object({
+  location: z.string().min(2).max(80),
+});
+
+const locationRangeQuerySchema = z.object({
+  startDate: isoDateSchema,
+  endDate: isoDateSchema,
+});
+
 export class ImpactEventController {
   async searchImpactEvents(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -65,6 +75,45 @@ export class ImpactEventController {
         data: events,
         meta: {
           count: events.length,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getImpactEventsByLocation(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { location } = locationParamSchema.parse(req.params);
+      const { startDate, endDate } = locationRangeQuerySchema.parse(req.query);
+
+      if (startDate > endDate) {
+        throw new BadRequestError(
+          'startDate must be before or equal to endDate',
+          'INVALID_DATE_RANGE'
+        );
+      }
+
+      const result = await impactEventService.getApplicableImpactEventsByDateRange(
+        location,
+        startDate,
+        endDate
+      );
+
+      res.json({
+        status: 'success',
+        data: result.events,
+        meta: {
+          location: result.location.code,
+          locationName: result.location.name,
+          locationType: result.location.type,
+          startDate,
+          endDate,
+          count: result.events.length,
         },
       });
     } catch (error) {

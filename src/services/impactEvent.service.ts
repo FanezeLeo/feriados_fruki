@@ -1,11 +1,30 @@
 import { impactEventRepository } from '@repositories/impactEvent.repository';
 import { cacheService } from './cache.service';
-import { ImpactEvent, ImpactEventQueryParams, PaginatedResponse } from '@/types';
+import { locationService } from './location.service';
+import {
+  ImpactEvent,
+  ImpactEventLocationRangeResult,
+  ImpactEventQueryParams,
+  Location,
+  PaginatedResponse,
+} from '@/types';
 import { NotFoundError } from '@utils/errors';
 import { logger } from '@utils/logger';
 
+type LocationWithDbFields = Location & {
+  state_code?: string;
+};
+
 function todayIsoDate(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+function applicableLocationCodes(location: Location): string[] {
+  if (location.type === 'country') return [location.code];
+  if (location.type === 'state') return ['BR', location.code];
+
+  const stateCode = location.stateCode ?? (location as LocationWithDbFields).state_code;
+  return stateCode ? ['BR', stateCode, location.code] : ['BR', location.code];
 }
 
 function toIsoDate(value: string | Date): string {
@@ -63,6 +82,24 @@ export class ImpactEventService {
     await cacheService.set('impact-events', cacheKey, result, 86400);
 
     return result;
+  }
+
+  async getApplicableImpactEventsByDateRange(
+    locationCode: string,
+    startDate: string,
+    endDate: string
+  ): Promise<ImpactEventLocationRangeResult> {
+    const location = await locationService.getLocationByCode(locationCode);
+    const events = await impactEventRepository.findByLocationCodesAndDateRange(
+      applicableLocationCodes(location),
+      startDate,
+      endDate
+    );
+
+    return {
+      location,
+      events: events.map(normalizeImpactEvent),
+    };
   }
 
   async getNextImpactEvents(limit = 5, country = 'BR'): Promise<ImpactEvent[]> {

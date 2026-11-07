@@ -100,6 +100,11 @@ export interface ImpactEventQueryParams extends Partial<PaginationParams> {
   endDate?: string;
 }
 
+export interface ImpactEventLocationRangeResult {
+  location: Location;
+  events: ImpactEvent[];
+}
+
 export interface LocationQueryParams extends Partial<PaginationParams> {
   type?: LocationType;
   state?: string;

@@ -1,9 +1,11 @@
 import { impactEventService } from '../../../src/services/impactEvent.service';
 import { impactEventRepository } from '../../../src/repositories/impactEvent.repository';
 import { cacheService } from '../../../src/services/cache.service';
+import { locationService } from '../../../src/services/location.service';
 
 jest.mock('../../../src/repositories/impactEvent.repository');
 jest.mock('../../../src/services/cache.service');
+jest.mock('../../../src/services/location.service');
 
 describe('ImpactEventService', () => {
   beforeEach(() => {
@@ -88,5 +90,51 @@ describe('ImpactEventService', () => {
       3,
       'BR',
     );
+  });
+
+  it('returns applicable impact events for a municipality date range', async () => {
+    (locationService.getLocationByCode as jest.Mock).mockResolvedValue({
+      id: 'loc-sao-paulo',
+      type: 'municipality',
+      code: 'SP-SAO-PAULO',
+      name: 'São Paulo',
+      state_code: 'SP',
+    });
+    (impactEventRepository.findByLocationCodesAndDateRange as jest.Mock).mockResolvedValue([
+      {
+        id: 'event-1',
+        slug: 'copa-2026-brasil-marrocos',
+        name: 'Copa 2026: Brasil x Marrocos',
+        startsAt: new Date('2026-06-13T22:00:00.000Z'),
+        localDate: '2026-06-13',
+        year: 2026,
+        category: 'sports',
+        impactLevel: 'high',
+        impactScope: 'national',
+        impactType: 'work_schedule_disruption',
+        countryCode: 'BR',
+        timezone: 'America/Sao_Paulo',
+        isHoliday: false,
+        status: 'scheduled',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
+
+    const result = await impactEventService.getApplicableImpactEventsByDateRange(
+      'sp-sao-paulo',
+      '2026-01-01',
+      '2026-12-31',
+    );
+
+    expect(locationService.getLocationByCode).toHaveBeenCalledWith('sp-sao-paulo');
+    expect(impactEventRepository.findByLocationCodesAndDateRange).toHaveBeenCalledWith(
+      ['BR', 'SP', 'SP-SAO-PAULO'],
+      '2026-01-01',
+      '2026-12-31',
+    );
+    expect(result.location.code).toBe('SP-SAO-PAULO');
+    expect(result.events).toHaveLength(1);
+    expect(result.events[0].localDate).toBe('2026-06-13');
   });
 });

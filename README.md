@@ -118,6 +118,7 @@ afetar operacoes, mobilidade, atendimento, turismo, comercio ou demanda.
 ```text
 GET /v1/impact-events
 GET /v1/impact-events/next
+GET /v1/impact-events/location/:location
 GET /v1/impact-events/:id
 ```
 
@@ -126,6 +127,7 @@ Exemplos:
 ```bash
 curl "http://localhost:3000/v1/impact-events?year=2026&impactLevel=high"
 curl "http://localhost:3000/v1/impact-events/next?country=BR&limit=5"
+curl "http://localhost:3000/v1/impact-events/location/SP-SAO-PAULO?startDate=2026-01-01&endDate=2026-12-31"
 ```
 
 ### Dados e changelog

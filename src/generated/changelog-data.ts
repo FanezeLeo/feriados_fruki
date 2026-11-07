@@ -3,6 +3,18 @@ import type { ChangelogEntry } from '@/types/changelog';
 
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    "id": "2026-10-23-adicionar-eventos-de-impacto-por-localidade-e-intervalo",
+    "date": "2026-10-23",
+    "type": "feature",
+    "title": "Adicionar eventos de impacto por localidade e intervalo",
+    "summary": "Adiciona o endpoint publico `GET /v1/impact-events/location/:location?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD`,",
+    "body_md": "Adiciona o endpoint publico `GET /v1/impact-events/location/:location?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD`,\nque retorna todos os eventos de impacto aplicaveis a uma localidade (pais, estado ou\nmunicipio) no intervalo informado, sem paginacao.\n\nA consulta considera a hierarquia nacional, estadual e municipal e omite eventos\ncancelados.",
+    "tags": [
+      "api"
+    ],
+    "url": null
+  },
+  {
     "id": "2026-09-26-atualizar-eventos-comerciais-e-lollapalooza-2027",
     "date": "2026-09-26",
     "type": "improvement",

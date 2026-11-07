@@ -88,6 +88,16 @@ const checks = [
     },
   },
   {
+    name: 'impact events by location and range',
+    path: '/v1/impact-events/location/SP-SAO-PAULO?startDate=2026-01-01&endDate=2026-12-31',
+    validate: (body) => {
+      assert(body.status === 'success', 'location impact events response should be successful');
+      assert(Array.isArray(body.data), 'location impact events data should be an array');
+      assert(body.meta.location === 'SP-SAO-PAULO', 'location impact events meta should echo the location');
+      assert(body.meta.count === body.data.length, 'location impact events meta count should match data length');
+    },
+  },
+  {
     name: 'ical export',
     path: '/v1/holidays/ical?location=BR&year=2026',
     validate: (body, response) => {

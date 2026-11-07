@@ -2,6 +2,7 @@ import request from 'supertest';
 import { createApp } from '../../src/app';
 import { Application } from 'express';
 import { impactEventService } from '../../src/services/impactEvent.service';
+import { NotFoundError } from '../../src/utils/errors';
 
 jest.mock('../../src/services/impactEvent.service');
 
@@ -93,6 +94,83 @@ describe('Impact events endpoints', () => {
 
     expect(response.body.meta.count).toBe(1);
     expect(impactEventService.getNextImpactEvents).toHaveBeenCalledWith(3, 'BR');
+  });
+
+  it('returns all applicable impact events for a location in a date range', async () => {
+    (impactEventService.getApplicableImpactEventsByDateRange as jest.Mock).mockResolvedValue({
+      location: {
+        id: 'loc-sao-paulo',
+        type: 'municipality',
+        code: 'SP-SAO-PAULO',
+        name: 'São Paulo',
+        stateCode: 'SP',
+      },
+      events: [
+        {
+          id: 'event-2026-brazil-morocco',
+          slug: 'copa-2026-brasil-marrocos',
+          name: 'Copa 2026: Brasil x Marrocos',
+          startsAt: new Date('2026-06-13T22:00:00.000Z'),
+          localDate: '2026-06-13',
+          year: 2026,
+          category: 'sports',
+          impactLevel: 'high',
+          impactScope: 'national',
+          impactType: 'work_schedule_disruption',
+          countryCode: 'BR',
+          timezone: 'America/Sao_Paulo',
+          isHoliday: false,
+          status: 'scheduled',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ],
+    });
+
+    const response = await request(app)
+      .get('/v1/impact-events/location/SP-SAO-PAULO?startDate=2026-01-01&endDate=2026-12-31')
+      .expect(200);
+
+    expect(response.body.data).toHaveLength(1);
+    expect(response.body.meta).toEqual({
+      location: 'SP-SAO-PAULO',
+      locationName: 'São Paulo',
+      locationType: 'municipality',
+      startDate: '2026-01-01',
+      endDate: '2026-12-31',
+      count: 1,
+    });
+    expect(impactEventService.getApplicableImpactEventsByDateRange).toHaveBeenCalledWith(
+      'SP-SAO-PAULO',
+      '2026-01-01',
+      '2026-12-31',
+    );
+  });
+
+  it('rejects an impact event location range with startDate after endDate', async () => {
+    await request(app)
+      .get('/v1/impact-events/location/SP-SAO-PAULO?startDate=2026-12-31&endDate=2026-01-01')
+      .expect(400);
+
+    expect(impactEventService.getApplicableImpactEventsByDateRange).not.toHaveBeenCalled();
+  });
+
+  it('rejects an impact event location range with invalid dates', async () => {
+    await request(app)
+      .get('/v1/impact-events/location/SP-SAO-PAULO?startDate=2026-02-31&endDate=2026-12-31')
+      .expect(400);
+
+    expect(impactEventService.getApplicableImpactEventsByDateRange).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 when the impact event location is not found', async () => {
+    (impactEventService.getApplicableImpactEventsByDateRange as jest.Mock).mockRejectedValue(
+      new NotFoundError('Location with code XX-NOWHERE not found'),
+    );
+
+    await request(app)
+      .get('/v1/impact-events/location/XX-NOWHERE?startDate=2026-01-01&endDate=2026-12-31')
+      .expect(404);
   });
 
   it('rejects invalid dates', async () => {
