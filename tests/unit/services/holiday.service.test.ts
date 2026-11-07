@@ -4,7 +4,7 @@ import { Application } from 'express';
 import { holidayService } from '../../../src/services/holiday.service';
 import { NotFoundError } from '../../../src/utils/errors';
 
-jest.mock('../../src/services/holiday.service');
+jest.mock('../../../src/services/holiday.service');
 
 describe('Holiday endpoints', () => {
   let app: Application;

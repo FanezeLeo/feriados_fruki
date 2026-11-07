@@ -4,10 +4,15 @@ import { Holiday } from '../../../src/types';
 
 jest.mock('../../../src/services/holiday.service');
 
+const civilDate = (date: string): Date => {
+  const [year, month, day] = date.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
 const holiday = (date: string, type: Holiday['type'], name = 'Feriado'): Holiday => ({
   id: `holiday-${date}-${type}-${name.toLowerCase().replace(/\s+/g, '-')}`,
   name,
-  date: new Date(`${date}T00:00:00.000Z`),
+  date: civilDate(date),
   year: Number(date.slice(0, 4)),
   type,
   isFixed: true,
